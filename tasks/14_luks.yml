@@ -1,0 +1,88 @@
+---
+- include: _get_blocks.yml
+
+- name: Disk | LUKS | create encryption devices with passphrase
+  command: |
+    cryptsetup -q \
+      --cipher {{ item.cipher | default(defaults.disk.luks.cipher) }} \
+      --sector-size {{ item.sectorSize | default(defaults.disk.luks.sectorSize) }} \
+      --key-size {{ item.keySize | default(defaults.disk.luks.keySize) }} \
+      --hash {{ item.hash | default(defaults.disk.luks.hash) }} \
+      --iter-time {{ item.iterTime | default(defaults.disk.luks.iterTime) }} \
+      luksFormat {{ block[item.device][0].path }}
+  args:
+    stdin: "{{ config['luks_' + item.name + '_passphrase'] }}"
+  when: 
+    - item.type == "passphrase"
+    - (block[item.device] | length ) == 1
+  with_items: "{{ disk.luks }}"
+
+- name: Disk | LUKS | create encryption devices with keyfile
+  shell: |
+    mkdir -p -m 0700 /mnt/luks 
+    touch /mnt/luks/{{ item.name }}.key
+    chmod 600 /mnt/luks/{{ item.name }}.key
+    openssl rand -out /mnt/luks/{{ item.name }}.key 256
+    cryptsetup -q \
+      --cipher {{ item.cipher | default(defaults.disk.luks.cipher) }} \
+      --sector-size {{ item.sectorSize | default(defaults.disk.luks.sectorSize) }} \
+      --key-size {{ item.keySize | default(defaults.disk.luks.keySize) }} \
+      --hash {{ item.hash | default(defaults.disk.luks.hash) }} \
+      --iter-time {{ item.iterTime| default(defaults.disk.luks.iterTime) }} \
+      luksFormat {{ block[item.device][0].path }} /mnt/luks/{{ item.name }}.key
+  args:
+    warn: false
+  when: 
+    - item.type == "keyfile"
+    - (block[item.device] | length ) == 1
+  with_items: "{{ disk.luks }}"
+
+- name: Disk | LUKS | format randomly encrypted devices (swap)
+  command: >
+    cryptsetup -q \
+      --cipher {{ item.cipher | default(defaults.disk.luks.cipher) }} \
+      --sector-size {{ item.sectorSize | default(defaults.disk.luks.sectorSize) }} \
+      --key-size {{ item.keySize | default(defaults.disk.luks.keySize) }} \
+      --hash {{ item.hash | default(defaults.disk.luks.hash) }} \
+      --iter-time {{ item.iterTime | default(defaults.disk.luks.iterTime) }} \
+      luksFormat {{ block[item.device][0].path }}
+  when: 
+    - item.type == "volatile"
+  args:
+    stdin: "volatile"
+  with_items: "{{ disk.luks }}"
+
+- name: Disk | LUKS | open encrypted devices with passphrase
+  command: >
+    cryptsetup -q \
+      open \
+      --allow-discards \
+      {{ block[item.device][0].path }} {{ item.name }}
+  args:
+    stdin: "{{ config['luks_' + item.name + '_passphrase'] }}"
+  when: 
+    - item.type == "passphrase"
+  with_items: "{{ disk.luks }}"
+
+- name: Disk | LUKS | open encrypted devices with keyfile
+  command: >
+    cryptsetup -q \
+      open \
+      --allow-discards \
+      --key-file /mnt/luks/{{ item.name }}.key \
+      {{ block[item.device][0].path }} {{ item.name }}
+  when: 
+    - item.type == "keyfile"
+  with_items: "{{ disk.luks }}"
+
+- name: Disk | LUKS | open randomly encrypted devices (swap)
+  command: >
+    cryptsetup -q \
+      open \
+      --allow-discards \
+      {{ block[item.device][0].path }} {{ item.name }}
+  when: 
+    - item.type == "volatile"
+  args:
+    stdin: "volatile"
+  with_items: "{{ disk.luks }}"

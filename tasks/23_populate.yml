@@ -1,0 +1,71 @@
+---
+- name: Bootstrap | Populate | bind mount pseudo filesystems
+  shell: |
+    mkdir -p {{ target.path }}/{{ item }}
+    mount | grep ' {{ target.path }}/{{ item }} ' || \
+      mount --bind /{{ item }} {{ target.path }}/{{ item }} warn=no
+  loop:
+    - proc
+    - sys
+    - dev
+    - dev/pts
+    - run/udev
+
+- name: Bootstrap | Populate | link mtab
+  file:
+    src: "/proc/mounts"
+    dest: "{{ target.path }}/etc/mtab"
+    state: link
+
+- name: Bootstrap | Populate | set tmp perm
+  file:
+    path: "{{ target.path }}/tmp"
+    mode: "1777"
+    state: directory
+
+- name: Bootstrap | Populate | move LUKS keys
+  shell: |
+    mkdir -p -m 0700 {{ target.path }}/etc/.luksSecret/ 
+    cp /mnt/luks/*.key {{ target.path }}/etc/.luksSecret/ || true
+    chmod 400 {{ target.path }}/etc/.luksSecret/* || true
+  args:
+    warn: false
+
+- include: _get_blocks.yml
+
+- name: Setup | Mounting | create /etc/crypttab
+  copy:
+    content: |
+      {% for l in disk.luks %}
+      {% if l.type == 'keyfile' %}
+      {% if block[l.device][0].type == 'part' %}
+      {{ '%-15s %-60s %-40s %-20s' | format(l.name, "/dev/disk/by-uuid/" + block[l.device][0].uuid, "/etc/.luksSecret/"+ l.name + ".key", "luks,discard") }}
+      {% else %}
+      {{ '%-15s %-60s %-40s %-20s' | format(l.name, block[l.device][0].path, "/etc/.luksSecret/"+ l.name + ".key", "luks,discard") }}
+      {% endif %}
+      {% elif l.type == 'volatile' %}
+      {{ '%-15s %-60s %-40s %-20s' | format(l.name, block[l.device][0].path, "/dev/urandom", "cipher=aes-xts-plain64,size=256,swap") }}
+      {% else %}
+      {% if block[l.device][0].type == 'part' %}
+      {{ '%-15s %-60s %-40s %-20s' | format(l.name, "/dev/disk/by-uuid/" + block[l.device][0].uuid, "none", "luks") }}
+      {% else %}
+      {{ '%-15s %-60s %-40s %-20s' | format(l.name, block[l.device][0].path, "none", "luks") }}
+      {% endif %}
+      {% endif %}
+      {% endfor %}
+    dest: "{{ target.path }}/etc/crypttab"
+    mode: 0644
+
+- name: Setup | Mounting | create /etc/fstab
+  copy:
+    content: |
+      {{ '%-40s %-15s %-8s %-20s %-8s %-8s' | format("# <file system>","<mount point>","<type>","<options>","<dump>","<pass>") }}
+      {% for f in filesystems %}
+      {% if block[f.device][0].type == 'part' %}
+      {{ '%-40s %-15s %-8s %-20s %-8s %-8s' | format("/dev/disk/by-uuid/" + block[f.device][0].uuid, f.path, f.type, f.options, "0", f.pass) }}
+      {% else %}
+      {{ '%-40s %-15s %-8s %-20s %-8s %-8s' | format(block[f.device][0].path, f.path, f.type, f.options, "0", f.pass) }}
+      {% endif %}
+      {% endfor %}
+    dest: "{{ target.path }}/etc/fstab"
+    mode: 0644

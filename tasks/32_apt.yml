@@ -1,0 +1,19 @@
+---
+- name: Setup | Apt | update sources.list
+  copy:
+    content: |
+      deb {{ sources[target.distribution].mirror }} {{ target.release }} {{ target.components | join(' ') }}
+      {% for suite in target.suites %}
+      deb {{ sources[target.distribution].mirror }} {{ suite }} {{ target.components | join(' ') }}
+      {% endfor %}
+    dest: "{{ target.path }}/etc/apt/sources.list"
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Setup | Apt | update & upgrade sources and install packages
+  shell: | 
+    chroot {{ target.path }} apt-get -y update
+    chroot {{ target.path }} apt-get -y install {{ target.additional_packages | default([]) | join(' ') }}
+    chroot {{ target.path }} apt-get -y upgrade
+    chroot {{ target.path }} apt-get clean

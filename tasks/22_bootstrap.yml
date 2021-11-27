@@ -1,0 +1,10 @@
+---
+- name: Bootstrap | Bootstrap | run bootstrap
+  command: |
+    debootstrap \
+      --components={{ target.components | join(',') }} \
+      --include={{ target.packages | join(',') }} \
+      {{ target.release }} \
+      {{ target.path }} \
+      {{ sources[target.distribution].mirror }}
+

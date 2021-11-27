@@ -1,0 +1,17 @@
+{% set myip = ansible_default_ipv4.address + "/" + ansible_default_ipv4.netmask %}
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    lan:
+      set-name: eth0
+      optional: true
+      match:
+        macaddress: {{ ansible_default_ipv4.macaddress }}
+      addresses:
+        - {{ myip | ipaddr('host/prefix') }}
+        - {{ ansible_default_ipv6.address }}/{{ ansible_default_ipv6.prefix }}
+      gateway4: {{ ansible_default_ipv4.gateway }}
+      gateway6: {{ ansible_default_ipv6.gateway }}
+      nameservers:
+        addresses: [ {{ config.dns_servers | default(defaults.dns_servers) | join(', ') }} ]

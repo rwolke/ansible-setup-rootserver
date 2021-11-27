@@ -1,0 +1,11 @@
+---
+- include: 00_prepare.yml
+  tags: [root-prepare]
+- include: 10_disk.yml
+  tags: [root-disk]
+- include: 20_bootstrap.yml
+  tags: [root-bootstrap]
+- include: 30_setup.yml
+  tags: [root-setup]
+- include: 40_configure.yml
+  tags: [root-configure]

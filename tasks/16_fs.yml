@@ -1,0 +1,16 @@
+---
+- include: _get_blocks.yml
+
+- name: Disk | Filesystem | create filesystems
+  shell: |
+    {% if item.type == 'swap' %}
+    if [ -f "{{ block[item.device][0].path }}" ]; then
+      mkswap {{ block[item.device][0].path }}
+    fi
+    {% else %}
+    mkfs.{{ item.type }} {{ item.mkfsopt | default("") }} {{ block[item.device][0].path }}
+    {% endif %}
+  when: 
+    - (item.type != "swap" and item.device in block )
+    - (block[item.device] | length ) == 1
+  with_items: "{{ filesystems }}"

@@ -1,0 +1,19 @@
+---
+defaults:
+  disk:
+    luks:
+      cipher: aes-xts-plain64
+      sectorSize: 4096
+      keySize: 256
+      hash: ripemd160
+      iterTime: 5000
+    raid:
+      level: 1
+      metadata: 1.20
+  dns_servers:
+    - 8.8.8.8
+    - 8.8.4.4
+    - 9.9.9.9
+sources:
+  ubuntu:
+    mirror: http://archive.ubuntu.com/ubuntu

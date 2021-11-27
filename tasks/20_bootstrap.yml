@@ -1,0 +1,4 @@
+---
+- include: 21_wipe.yml
+- include: 22_bootstrap.yml
+- include: 23_populate.yml

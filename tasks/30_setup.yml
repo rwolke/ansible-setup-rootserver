@@ -1,0 +1,4 @@
+---
+- include: 31_locales.yml
+- include: 32_apt.yml
+- include: 33_grub.yml

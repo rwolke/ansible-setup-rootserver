@@ -1,0 +1,31 @@
+---
+- name: Disk | Clean | remove previous setups
+  shell: |
+    for i in `mount |grep "on /mnt/newsys" | cut -d' ' -f3| awk '{ print length, $0 }' | sort -nr -s | cut -d" " -f2-`; do
+      umount $i
+    done
+
+- name: Disk | Clean | remove lvms
+  shell: |
+    lvs --noheadings -o lv_full_name |xargs -rn1 lvremove -fy
+    vgs --noheadings -o name |xargs -rn1 vgremove -fy
+    pvs --noheadings -o name |xargs -rn1 pvremove -fy
+
+- name: Disk | Clean | remove cryptomaps
+  shell: |
+    for i in `ls -1 /dev/dm-*`; do
+      dmsetup remove $i
+    done
+
+- name: Disk | Clean | remove raids
+  shell: |
+    for i in `ls -1 /dev/md*`; do
+      mdadm --stop $i || true
+    done
+
+- name: Disk | Clean | partitioning
+  shell: |
+    {% for p in disk.devices %}
+    echo -e "g\nw\n" | fdisk -w always {{ p.device }}
+    {% endfor %}
+    partprobe

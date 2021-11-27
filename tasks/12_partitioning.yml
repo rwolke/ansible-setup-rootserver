@@ -1,0 +1,12 @@
+---
+- name: Disk | Partitioning | create partitions
+  command: |
+    sgdisk -o {{ item.device }} 
+    {% for p in disk.partitioning[item.partitioning] %}
+    sgdisk \
+      -n {{ loop.index }}:0:+{{ p.size | default("0") }} \
+      -t {{ loop.index }}:{{ p.type | default("fd00") }} \
+      -c {{ loop.index }}:{{ p.name | default("p" + (loop.index|string) ) }} \
+      {{ item }}
+    {% endfor %}
+  with_items: "{{ disk.devices }}"

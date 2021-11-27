@@ -1,0 +1,5 @@
+---
+- include: 41_cryptoboot.yml
+- include: 42_network.yml
+- include: 43_openssh.yml
+- include: 44_accounts.yml

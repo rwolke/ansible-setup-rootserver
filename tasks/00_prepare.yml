@@ -1,0 +1,14 @@
+---
+- name: Prepare | install required tools
+  package:
+    name:
+      - debootstrap
+      - parted
+      - gdisk
+      - xfsprogs
+      - e2fsprogs
+      - cryptsetup
+      - mdadm
+      - jq
+      - openssl
+    state: present

@@ -1,0 +1,16 @@
+---
+- name: Disk | __helper__ | get block device information
+  shell: |
+    ( \
+    lsblk -b -nlJo partlabel,path,type,uuid | \
+      jq '.blockdevices | map(select(.partlabel)) | group_by(.partlabel) | map({key:("group_"+.[0].partlabel), value: [.[]]}) |from_entries' ; \
+    lsblk -b -nlJo name,path,type,partlabel,uuid | \
+      jq '.blockdevices | group_by(.name) | map({key:(.[0].name), value: [.[]]}) |from_entries' \
+    ) | jq -s add  
+  changed_when: False
+  register: block
+- name: Disk | __helper__ | set block variable
+  set_fact:
+    block: "{{ block.stdout_lines | join('') | from_json }}"
+#- debug:
+#    var: block

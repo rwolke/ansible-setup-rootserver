@@ -1,0 +1,8 @@
+---
+- name: Setup | Grub | install grub
+  shell: |
+    sed -i 's/quiet splash//' {{ target.path }}/etc/default/grub
+    {% for d in disk.devices %}
+    chroot {{ target.path }} grub-install {{ d.device }}
+    {% endfor %}
+    chroot {{ target.path }} update-grub

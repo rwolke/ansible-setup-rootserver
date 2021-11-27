@@ -1,0 +1,35 @@
+---
+- name: Configure | Cryptoboot | enforce cryptsetup in initramfs
+  copy:
+    dest: "{{ target.path }}/etc/initramfs-tools/conf.d/cryptsetup"
+    content: "export CRYPTSETUP=y"
+
+- name: Configure | Cryptoboot | boot change port
+  lineinfile:
+    state: present
+    line: 'DROPBEAR_OPTIONS="-I 180 -j -k -p {{ config.boot_ssh_port }} -s"'
+    path: "{{ target.path }}/etc/dropbear-initramfs/config"
+    regex: "DROPBEAR_OPTIONS"
+
+- name: Configure | Cryptoboot | set ip for dropbear
+  lineinfile:
+    state: present
+    line: 'IP={{ ansible_default_ipv4.address }}::{{ ansible_default_ipv4.gateway }}:{{ ansible_default_ipv4.netmask }}:server'
+    path: "{{ target.path }}/etc/initramfs-tools/initramfs.conf"
+    regex: "IP="
+
+- name: Configure | Cryptoboot | set keyfiles
+  copy:
+    dest: "{{ target.path }}/etc/dropbear-initramfs/authorized_keys"
+    content: "{{ config.boot_ssh_keys }}"
+
+- name: Configure | Cryptoboot | update initramfs
+  shell: |
+    if [ -f {{ target.path }}/boot/initrd.img ]; then
+      chroot {{ target.path }} update-initramfs -u -k all
+    else
+      chroot {{ target.path }} update-initramfs -c -k all
+    fi
+
+- name: Configure | Cryptoboot | update grub
+  command: chroot {{ target.path }} update-grub

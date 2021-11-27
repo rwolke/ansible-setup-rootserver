@@ -1,0 +1,6 @@
+---
+- name: Configure | OpenSSH | change ssh port
+  lineinfile:
+    path: "{{ target.path }}/etc/ssh/sshd_config"
+    regexp: "#?Port [0-9]+"
+    line: "Port {{ config.ssh_port }}"

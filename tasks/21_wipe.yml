@@ -1,0 +1,26 @@
+---
+- name: Bootstrap | Wipe | remove previous setups
+  shell: |
+    for i in `mount |grep "on {{ target.path }}" | cut -d' ' -f3| awk '{ print length, $0 }' | sort -nr -s | cut -d" " -f2-`; do
+      umount $i
+    done
+
+- include: _get_blocks.yml
+- name: Bootstrap | Wipe | recreate root filesystem
+  command: |
+    mkfs.{{ item.type }} {{ item.mkfsopt | default("") }} {{ block[item.device][0].path }}
+  when: 
+    - item.device in block
+    - (block[item.device] | length ) == 1
+    - item.path == "/"
+  with_items: "{{ filesystems }}"
+
+- name: Bootstrap | Wipe | mount filesystems
+  shell: |
+    mkdir -p {{ target.path }}{{ item.path }}
+    mount {{ block[item.device][0].path }} {{ target.path }}{{ item.path }}
+  when: 
+    - item.path != "none"
+    - item.type != "swap"
+    - (block[item.device] | length ) == 1
+  with_items: "{{ filesystems }}"

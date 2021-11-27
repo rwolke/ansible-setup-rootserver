@@ -1,0 +1,198 @@
+---
+# sample configuration file, better store as host_var
+config:
+  # passphrase should be stored in vault
+  luks_cryptoroot_passphrase: "{{ luks_passphrase }}"
+  hostname: hostname
+  # dropbear ist started on this port with the following key to manually unlock root filesystem
+  boot_ssh_port: 12345
+  boot_ssh_keys: |
+    ecdsa-sha2-nistp256 AAAAXXXXXYYYYZZZZ boot@hostname.domain
+  # main system ssh port
+  ssh_port: 23456
+  root_password: $6$mccv02lLTOl91y.2$5Gstr5rl7KOfgw2fpMqvBKH5v.jxFBFU4N7F5W/TZdL94I1hV4pKPfuGGd6mbzrnAWpUvjRV0F4KopoQKJAD/0
+  users:
+    - name: username
+      groups: 
+        - sudo
+      password: $6$YPzC6kSP1IuRumZ8$wIWHE5NjYM4V3o.6QMEPlEIemKgESoXdCJ9PjFndGpSZWk1ed1wFkyig./UwzZVSUGFLHOxzrE5dsVUnNlV2E0
+      auth_key_file: |
+        ecdsa-sha2-nistp256 AAAAXXXXXYYYYZZZZ user@hostname.domain
+
+# structure persistent devices
+disk:
+  # all devices to be handled in setup
+  devices:
+    # name device parth and partioning scheme (below)
+    - device: /dev/sda
+      partitioning: default
+    - device: /dev/sdb
+      partitioning: default
+
+  # partitioning will use gpt
+  partitioning:
+    default:
+        # partlabel set, used to reference devices later (as group_XXX)
+      - name: BIOS_grub
+        # sgparted 
+        type: ef02
+        # size of partition (has to be sgparted compatible)
+        size: 1024KiB
+      - name: boot
+        type: fd00
+        size: 1023MiB
+      - name: root
+        type: fd00
+        size: 16GiB
+      - name: swap
+        type: 8308
+        size: 16GiB
+      - name: vg1
+        type: fd00
+        size: 16GiB
+      - name: vg0
+        type: fd00
+        size: 16GiB
+      - name: data
+        type: fb00
+        # left out size => use remaining space
+  
+  # software raids to configure
+  raid:
+    # md0 uses group_boot devices, namely sda1 and sdb1 
+    - name: md0
+      devices: group_boot
+      metadata: 0.90
+    - name: md100
+      devices: group_root
+    - name: md110
+      devices: group_vg1
+  
+  # create encrypted volumes 
+  #  ... on device (e.g. sda), 
+  #  ... on raid (e.g. md0)
+  #  ... but NOT on group_XXX (as possibly multiple devices)
+  # type can be
+  # - passhrase - unlock manually during boot
+  # - volatile - random key, used for swap (no suspend possible)
+  # - keyfile - addional key placed in /etc/.luksSecrets/ on (encrypted) root
+  luks:
+    - name: cryptoroot
+      type: passphrase
+      device: md100
+    - name: crypto-vg1
+      type: keyfile
+      device: md110
+    - name: crypto-vg0-a
+      type: keyfile
+      device: sda6
+    - name: crypto-vg0-b
+      type: keyfile
+      device: sdb6
+    - name: cryptoswap-a
+      type: volatile
+      device: sda4
+    - name: cryptoswap-b
+      type: volatile
+      device: sdb4
+
+  # lvm to create
+  lvm:
+    # volume groups to create
+    # ATTENTION: it's device*S* because a volume can span on multiple volumes
+    # possible values are:
+    #   - luks device by name e.g. crypto-vg1
+    #   - raid by name e.g. md123
+    #   - disk by name e.g. sda
+    #   - partion by name e.g. sda1
+    #   - parttions by group name e.g. group_data
+    vg: 
+      - name: vg1
+        devices: crypto-vg1
+      - name: vg0
+        devices: 
+          - crypto-vg0-a
+          - crypto-vg0-b
+    lv:
+      - name: log
+        vg: vg1
+        size: 1G
+      - name: tmp
+        vg: vg0
+        size: 4G
+
+filesystems:
+    # options used during mkfs
+  - mkfsopt: -b 4096 -L root
+    device: cryptoroot
+    path: /
+    type: ext4
+    options: "errors=remount-ro"
+    pass: 1
+  - mkfsopt: -b 4096 -L boot
+    device: md0
+    path: /boot
+    type: ext2
+    options: "defaults"
+    pass: 2
+  - device: vg1-log
+    path: /var/log
+    type: ext4
+    options: "defaults"
+    pass: 1
+  - device: vg0-tmp
+    path: /tmp
+    type: ext4
+    options: "defaults"
+    pass: 1
+  - device: cryptoswap-a
+    path: none
+    type: swap
+    options: sw
+    pass: 0
+  - device: cryptoswap-b
+    path: none
+    type: swap
+    options: sw
+    pass: 0
+
+target:
+  path: /mnt/newsys
+  distribution: ubuntu
+  release: focal
+  # packages installed with bootstrap
+  packages:
+    - ubuntu-standard
+    - linux-image-generic
+    - grub-pc
+    - openssh-server
+    # for luks
+    - cryptsetup
+    # for lvm
+    - lvm2
+    # for raid
+    - mdadm
+    # additional
+    - tmux
+    - ufw
+    - net-tools
+  suites:
+    - focal-updates
+    - focal-security
+  components:
+    - main
+    - restricted
+    - universe
+  # packages installed later with apt install under chroot
+  additional_packages:
+    - dropbear-initramfs
+    - tcpdump
+    - ufw
+    - mc
+    - nano
+  locales:
+    tz: "Europe/Berlin"
+    default: en_US.UTF-8
+    list:
+      - de_DE.UTF-8 UTF-8
+      - en_US.UTF-8 UTF-8

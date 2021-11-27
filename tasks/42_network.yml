@@ -1,0 +1,54 @@
+---
+- name: Configure | Network | set hostname & hosts in file
+  shell: |
+    echo "{{ config.hostname }}" > {{ target.path }}/etc/hostname
+    sed -i '/{{ config.hostname }}/d' {{ target.path }}/etc/hosts
+    echo "{{ ansible_default_ipv4.address }}		{{ config.hostname }}" >> {{ target.path }}/etc/hosts
+    echo "{{ ansible_default_ipv6.address }}		{{ config.hostname }}" >> {{ target.path }}/etc/hosts
+
+- name: Configure | Network | set netplan
+  template:
+    dest: "{{ target.path }}/etc/netplan/01-netplan.yaml"
+    src: templates/netplan.yaml
+
+- name: Configure | Network | set interface name on first boot
+  file:
+    dest: "{{ target.path }}/etc/first_boot.sh"
+    mode: 0755
+    content: |
+      #/bin/bash
+
+      ifname=`ip -o link | awk '$2 != "lo:" {print $2, $(NF-2)}' | grep 7c |cut -d: -f1`
+      sed -i "s/eth0:/$ifname:/" /etc/netplan/01-netplan.yaml
+
+      systemctl stop first_boot.service
+      systemctl disable first_boot.service
+      rm /etc/systemd/system/first_boot.service
+      rm /etc/first_boot.sh
+      systemctl daemon-reload
+      systemctl reset-failed
+
+      netplan generate
+      netplan apply
+
+- name: Configure | Network | create first_boot - service
+  file:
+    dest: "{{ target.path }}/etc/systemd/system/first_boot"
+    mode: 0644
+    content: |
+      [Unit]
+      Description=First run specifics
+      After=network-online.target
+      Requires=network-online.target
+
+      [Service]
+      Type=simple
+      ExecStart=/etc/first_boot.sh
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Configure | Network | install first_boot service 
+  shell: |
+    chroot {{ target.path }} systemctl daemon-reload
+    chroot {{ target.path }} systemctl enable first_boot

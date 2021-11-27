@@ -1,0 +1,15 @@
+---
+- include: _get_blocks.yml
+
+- name: Disk | RAIDs | create RAIDs
+  shell: |
+    # if superBlock / raid-marker => yes we want to overwrite!
+    echo "y" | mdadm \
+      --create /dev/{{ item.name }} \
+      --level {{ item.level | default(defaults.disk.raid.level) }} \
+      --raid-devices {{ block[item.devices] | count }} \
+      --name {{ item.name}} \
+      --metadata {{ item.metadata | default(defaults.disk.raid.metadata) }} \
+      {{ block[item.devices] | join(" ", "path") }}
+  with_items: "{{ disk.raid }}"
+

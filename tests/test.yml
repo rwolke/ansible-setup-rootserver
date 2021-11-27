@@ -1,0 +1,7 @@
+---
+- hosts: sample-host
+  vars_files:
+    - sample-host.yml
+  remote_user: root
+  roles:
+    - setup-rootserver

@@ -1,0 +1,25 @@
+---
+- include: _get_blocks.yml
+
+- name: Disk | LVM | create vgs
+  shell: |
+    {% if item.devices is string %}
+    {% set _devices = [item.devices] %}
+    {% else %}
+    {% set _devices = item.devices %}
+    {% endif %}
+    {% for pv in _devices %}
+    pvcreate {{ block[pv] | join(' ', 'path') }}
+    {% if loop.first %}
+    vgcreate {{ item.name }} {{ block[pv] | join(' ', 'path') }}
+    {% else %}
+    vgextend {{ item.name }} {{ block[pv] | join(' ', 'path') }}
+    {% endif %}
+    {% endfor %}
+  with_items: "{{ disk.lvm.vg }}"
+
+- name: Disk | LVM | create lvs
+  command: >
+    lvcreate -n {{ item.name}} -L {{ item.size }} {{ item.vg }}
+  with_items: "{{ disk.lvm.lv }}"
+

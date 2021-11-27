@@ -1,0 +1,38 @@
+---
+- name: Setup | Locales | configure timezone
+  shell: |
+    rm {{ target.path }}/etc/localtime
+    ln -fs {{ target.path }}/usr/share/zoneinfo/{{ target.locales.tz }} {{ target.path }}/etc/localtime
+    chroot {{ target.path }} dpkg-reconfigure -f noninteractive tzdata
+
+- name: Setup | Locales | write configured locales
+  lineinfile:
+    state: present
+    line: '{{ item }}'
+    path: "{{ target.path }}/etc/locale.gen"
+    regex: "{{ item }}"
+  loop: "{{ target.locales.list }}"
+
+- name: Setup | Locales | reconfigure locales
+  shell: |
+    echo 'LANG="{{ target.locales.default }}"' > {{ target.path }}/etc/default/locale
+    chroot {{ target.path }} dpkg-reconfigure -f noninteractive locales
+    chroot {{ target.path }} locales-gen
+    chroot {{ target.path }} update-locale LANG={{ target.locales.default }}
+
+- name: Setup | Locales | set keyboard layout
+  shell: |
+    DEBIAN_FRONTEND=noninteractive chroot {{ target.path }} apt-get install -y console-setup keyboard-configuration
+        
+    # this is the trick, you have to change the default keyboard config before 
+    # running dpkg-reconfigure or you will always end with what it is configured
+    #  in /etc/default/keyboard, so for a french keyboard for example:
+    echo '
+    XKBMODEL="pc105"
+    XKBLAYOUT="de"
+    XKBVARIANT=""
+    XKBOPTIONS=""
+        
+    BACKSPACE="guess"
+    ' > {{ target.path }}/etc/default/keyboard
+    dpkg-reconfigure -f noninteractive keyboard-configuration

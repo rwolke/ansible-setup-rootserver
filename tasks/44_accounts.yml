@@ -1,0 +1,20 @@
+---
+- name: Configure | Accounts | create accounts
+  shell: |
+    chroot {{ target.path }} deluser {{ item.name }} || true
+    chroot {{ target.path }} useradd -m -s /bin/bash -p '{{ item.password }}' {{ item.name }}
+    {% for g in item.groups %}
+    chroot {{ target.path }} adduser {{ item.name }} {{ g }}
+    {% endfor %}
+    homedir=$( chroot {{ target.path }} getent passwd "{{ item.name }}" | cut -d: -f6 )
+    echo $homedir >> /home.txt
+    mkdir -p {{ target.path }}$homedir/.ssh
+    echo "{{ item.auth_key_file }}" > {{ target.path }}$homedir/.ssh/authorized_keys
+    chroot {{ target.path }} chown {{ item.name }} -R $homedir/.ssh
+  args:
+    warn: false
+  with_items: "{{ config.users }}"
+
+- name: Configure | Accounts | set root password
+  shell: |
+    echo 'root:{{ config.root_password }}' | chpasswd -e -R {{ target.path }}

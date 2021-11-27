@@ -1,0 +1,7 @@
+---
+- include: 11_cleanup.yml
+- include: 12_partitioning.yml
+- include: 13_raid.yml
+- include: 14_luks.yml
+- include: 15_lvm.yml
+- include: 16_fs.yml
